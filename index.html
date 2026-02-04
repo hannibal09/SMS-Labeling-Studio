@@ -33,7 +33,7 @@
     <header class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shadow-sm z-10">
         <div class="flex items-center gap-3">
             <h1 class="text-xl font-bold text-indigo-700">SMS Labeling Studio</h1>
-            <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono">v1.3</span>
+            <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono">v1.4</span>
         </div>
         <div class="flex items-center gap-4 text-sm">
             <div id="status-storage" class="flex items-center gap-1 text-slate-500">
@@ -226,38 +226,16 @@
                         <div class="border-b pb-4">
                             <h3 class="text-sm font-bold text-slate-400 uppercase mb-4 tracking-wider">3. Categorization
                             </h3>
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 gap-4">
                                 <div>
-                                    <label
-                                        class="block text-xs font-bold text-slate-500 uppercase mb-1">Category</label>
-                                    <select id="inp-category" class="w-full border border-slate-300 rounded px-3 py-2">
-                                        <option value="N/A">N/A</option>
-                                        <option value="dining">Dining</option>
-                                        <option value="shopping">Shopping</option>
-                                        <option value="travel">Travel</option>
-                                        <option value="grocery">Grocery</option>
-                                        <option value="bill-payment">Bill Payment</option>
-                                        <option value="utilities">Utilities</option>
-                                        <option value="health">Health</option>
-                                        <option value="entertainment">Entertainment</option>
-                                        <option value="investment">Investment</option>
-                                        <option value="salary">Salary</option>
-                                        <option value="misc">Misc</option>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Category
+                                        (Parent > Child)</label>
+                                    <select id="inp-category"
+                                        class="w-full border border-slate-300 rounded px-3 py-2 font-mono text-sm">
+                                        <!-- Populated by JS -->
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Match
-                                        Method</label>
-                                    <select id="inp-match-method"
-                                        class="w-full border border-slate-300 rounded px-3 py-2">
-                                        <option value="N/A">N/A</option>
-                                        <option value="WORD_MATCH">WORD_MATCH</option>
-                                        <option value="REGEX">REGEX</option>
-                                        <option value="SENDER_ID">SENDER_ID</option>
-                                        <option value="FALLBACK">FALLBACK</option>
-                                    </select>
-                                </div>
-                                <div class="col-span-2">
                                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Matched
                                         Keyword</label>
                                     <input type="text" id="inp-match-key"
@@ -314,7 +292,19 @@
                                     <input type="number" id="inp-rewards"
                                         class="w-full border border-slate-300 rounded px-3 py-2" placeholder="0">
                                 </div>
-                                <div class="flex items-center pt-6">
+                                <div>
+                                    <label
+                                        class="block text-xs font-bold text-slate-500 uppercase mb-1">Currency</label>
+                                    <input type="text" id="inp-currency"
+                                        class="w-full border border-slate-300 rounded px-3 py-2" value="INR">
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Notes</label>
+                                    <textarea id="inp-notes"
+                                        class="w-full border border-slate-300 rounded px-3 py-2 h-16 text-sm"
+                                        placeholder="Optional notes..."></textarea>
+                                </div>
+                                <div class="flex items-center pt-2">
                                     <label class="flex items-center cursor-pointer">
                                         <input type="checkbox" id="inp-hidden"
                                             class="form-checkbox h-4 w-4 text-indigo-600">
@@ -354,7 +344,7 @@
         </main>
     </div>
 
-    <script type="module" src="js/app.js?v=1.3"></script>
+    <script type="module" src="js/app.js?v=1.4"></script>
 </body>
 
 </html>

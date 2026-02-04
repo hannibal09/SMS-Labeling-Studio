@@ -42,77 +42,176 @@ async function refreshStats() {
     document.getElementById('page-indicator').textContent = `Page ${currentPage + 1} of ${maxPage + 1 || 1}`;
 }
 
-async function handleFileUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-        try {
-            const json = JSON.parse(event.target.result);
-
-            let itemsToImport = [];
-
-            // Case A: Flat Array (Legacy)
-            if (Array.isArray(json)) {
-                itemsToImport = json;
-            }
-            // Case B: Wrapped Object (Project A Export)
-            else if (json.samples && Array.isArray(json.samples)) {
-                itemsToImport = json.samples;
-            }
-            else {
-                throw new Error('JSON must be an array or have a "samples" array.');
-            }
-
-            // Convert to internal format: { original: sms, label: {}, status: 'new' }
-            const payload = itemsToImport.map(sms => ({
-                original: sms,
-                label: {},
-                status: 'new'
-            }));
-
-            if (confirm(`Import ${payload.length} messages? This will CLEAR existing data.`)) {
-                await db.clearAll();
-                await db.importBulk(payload);
-                alert('Import Successful!');
-                location.reload();
-            }
-        } catch (err) {
-            console.error(err);
-            alert(`Invalid JSON file: ${err.message}`);
-        }
-    };
-    reader.readAsText(file);
-}
+const CATEGORIES = [
+    { id: "dining", name: "Dining & Food", parent_id: null },
+    { id: "shopping", name: "Shopping & Retail", parent_id: null },
+    { id: "travel", name: "Travel & Transport", parent_id: null },
+    { id: "entertainment", name: "Entertainment", parent_id: null },
+    { id: "healthcare", name: "Healthcare & Wellness", parent_id: null },
+    { id: "bills", name: "Bills & Utilities", parent_id: null },
+    { id: "financial", name: "Financial Services", parent_id: null },
+    { id: "education", name: "Education", parent_id: null },
+    { id: "personal-care", name: "Personal Care", parent_id: null },
+    { id: "home", name: "Home & Living", parent_id: null },
+    { id: "others", name: "Others", parent_id: null },
+    { id: "dining-delivery", name: "Food Delivery", parent_id: "dining" },
+    { id: "dining-restaurants", name: "Restaurants", parent_id: "dining" },
+    { id: "dining-groceries", name: "Groceries", parent_id: "dining" },
+    { id: "shopping-ecommerce", name: "E-commerce", parent_id: "shopping" },
+    { id: "shopping-jewellery", name: "Jewellery & Accessories", parent_id: "shopping" },
+    { id: "shopping-electronics", name: "Electronics & Gadgets", parent_id: "shopping" },
+    { id: "shopping-fashion", name: "Fashion & Apparel", parent_id: "shopping" },
+    { id: "travel-flight", name: "Flight Bookings", parent_id: "travel" },
+    { id: "travel-cab", name: "Cab & Ride Sharing", parent_id: "travel" },
+    { id: "travel-hotel", name: "Hotel Bookings", parent_id: "travel" },
+    { id: "travel-fuel", name: "Fuel & Petrol", parent_id: "travel" },
+    { id: "travel-parking", name: "Parking & Tolls", parent_id: "travel" },
+    { id: "bills-electricity", name: "Electricity", parent_id: "bills" },
+    { id: "bills-mobile", name: "Mobile Recharge", parent_id: "bills" },
+    { id: "bills-broadband", name: "Broadband & Internet", parent_id: "bills" },
+    { id: "bills-water", name: "Water Bill", parent_id: "bills" },
+    { id: "bills-gas", name: "Gas Bill", parent_id: "bills" },
+    { id: "financial-wallet", name: "Wallet Loading", parent_id: "financial" },
+    { id: "financial-transfer", name: "Money Transfers", parent_id: "financial" },
+    { id: "financial-emi", name: "EMI Payments", parent_id: "financial" },
+    { id: "financial-insurance", name: "Insurance", parent_id: "financial" },
+    { id: "financial-investment", name: "Investments & SIP", parent_id: "financial" },
+    { id: "entertainment-ott", name: "OTT Subscriptions", parent_id: "entertainment" },
+    { id: "entertainment-movies", name: "Movies & Cinema", parent_id: "entertainment" },
+    { id: "entertainment-gaming", name: "Gaming", parent_id: "entertainment" },
+    { id: "healthcare-pharmacy", name: "Pharmacy & Medicine", parent_id: "healthcare" },
+    { id: "healthcare-fitness", name: "Gym & Fitness", parent_id: "healthcare" },
+    { id: "personal-care-salon", name: "Salon & Spa", parent_id: "personal-care" },
+    { id: "home-furniture", name: "Furniture", parent_id: "home" },
+    { id: "home-appliances", name: "Home Appliances", parent_id: "home" },
+    { id: "education-online", name: "Online Courses", parent_id: "education" },
+    { id: "education-school", name: "School Fees", parent_id: "education" }
+];
 
 // Global App Object
 window.app = {
-    async prevPage() {
+    async init() {
+        console.log('App Initializing...');
+        await db.init();
+        this.initCategories();
+        this.bindEvents();
+        this.refreshList();
+    },
+
+    initCategories() {
+        const select = document.getElementById('inp-category');
+        select.innerHTML = '<option value="N/A">N/A</option>';
+
+        // 1. Get Parents
+        const parents = CATEGORIES.filter(c => !c.parent_id);
+
+        parents.forEach(p => {
+            // Add Parent
+            const pOption = document.createElement('option');
+            pOption.value = p.id;
+            pOption.textContent = p.name; // Keep parent Selectable
+            pOption.style.fontWeight = 'bold';
+            select.appendChild(pOption);
+
+            // Add Children
+            const children = CATEGORIES.filter(c => c.parent_id === p.id);
+            children.forEach(c => {
+                const cOption = document.createElement('option');
+                cOption.value = c.id;
+                cOption.textContent = `  ↳ ${c.name}`; // Indent
+                select.appendChild(cOption);
+            });
+        });
+    },
+
+    bindEvents() {
+        document.getElementById('file-upload').addEventListener('change', (e) => this.handleFileUpload(e));
+
+        // Keybindings
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                this.saveItem();
+            }
+            if (e.ctrlKey && e.key === 'k') {
+                e.preventDefault();
+                this.skipItem();
+            }
+        });
+    },
+
+    async handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const json = JSON.parse(e.target.result);
+                // Ensure array
+                const data = Array.isArray(json) ? json : (json.messages || []);
+
+                // Add Unique DB ID if not present + Unique ID for Export
+                const processed = data.map(item => ({
+                    ...item,
+                    timestamp: item.timestamp || Date.now(), // Ensure Timestamp
+                    // Generate a consistent ID if not present
+                    manual_id: `hash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                }));
+
+                await db.importData(processed);
+                this.refreshList();
+                alert(`Imported ${processed.length} messages.`);
+            } catch (err) {
+                console.error(err);
+                alert('Invalid JSON file');
+            }
+        };
+        reader.readAsText(file);
+    },
+
+    // ... (rest of simple methods)
+
+    async refreshList() {
+        const count = await db.countItems();
+        const stats = await db.getStats();
+
+        const total = count;
+        const done = stats.done || 0;
+        const skipped = stats.skipped || 0;
+
+        document.getElementById('stats-counter').textContent = `${done} / ${total} Done (${skipped} Skipped)`;
+
+        // Load Page
+        await loadPage(currentPage);
+        document.getElementById('page-indicator').textContent = `Page ${currentPage + 1}`;
+    },
+
+    prevPage() {
         if (currentPage > 0) {
             currentPage--;
-            loadPage(currentPage);
+            this.refreshList();
         }
     },
 
-    async nextPage() {
+    nextPage() {
         currentPage++;
-        loadPage(currentPage);
+        this.refreshList();
     },
 
     async selectItem(id) {
         selectedId = id;
-
-        // Highlight in List
-        document.querySelectorAll('.sms-item').forEach(el => el.classList.remove('selected', 'current'));
-        const el = document.getElementById(`item-${id}`);
-        if (el) el.classList.add('selected', 'current');
-
-        // Load Data
         const item = await db.getItem(id);
-        if (!item) return;
-
-        renderEditor(item);
+        if (item) {
+            renderEditor(item);
+            // Highlight list item
+            document.querySelectorAll('.sms-item').forEach(el => el.classList.remove('bg-indigo-50', 'border-indigo-500'));
+            const el = document.getElementById(`item-${id}`);
+            if (el) {
+                el.classList.add('bg-indigo-50', 'border-indigo-500');
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
     },
 
     autoFill() {
@@ -145,8 +244,7 @@ window.app = {
             document.getElementById('inp-merch-raw').value = m;
             document.getElementById('inp-merch-clean').value = m.toLowerCase();
             document.getElementById('inp-match-key').value = m.toLowerCase();
-            document.getElementById('inp-match-method').value = 'WORD_MATCH';
-            document.getElementById('inp-category').value = 'misc'; // Default
+            document.getElementById('inp-category').value = 'others'; // Default
         }
 
         // 5. Intent/Status Guess
@@ -167,6 +265,9 @@ window.app = {
     async saveItem() {
         if (!selectedId) return;
 
+        const item = currentItems.find(i => i.id === selectedId);
+        const original = item.original || {};
+
         // Construct the Nested Schema Object
         const labelData = {
             parsing: {
@@ -177,16 +278,14 @@ window.app = {
                 account_digits: val('inp-acc'),
                 transaction_type: val('inp-type'),
                 balance_available: floatVal('inp-balance'),
-                // We don't have is_otp input, derive from intent
                 is_otp: val('inp-intent') === 'OTP',
                 upi_ref: val('inp-upi'),
                 date_extracted: val('inp-date-ext')
             },
             categorization: {
                 category_id: val('inp-category'),
-                match_method: val('inp-match-method'),
+                // Match Method REMOVED by user request
                 matched_keyword: val('inp-match-key'),
-                // default values we can't fully guess yet
                 confidence: 1.0
             },
             account_resolution: {
@@ -195,13 +294,15 @@ window.app = {
                 account_type: val('inp-acc-type')
             },
             transaction_fields: {
+                parent_transaction_id: original.manual_id || null, // The Unique ID
                 amount: floatVal('inp-amount'),
                 status: val('inp-status'),
                 type: val('inp-type'),
                 reward_points: floatVal('inp-rewards'),
                 is_hidden: document.getElementById('inp-hidden').checked,
-                currency: 'INR',
-                timestamp: currentItems.find(i => i.id === selectedId).original.timestamp
+                currency: val('inp-currency'),
+                timestamp: original.timestamp,
+                notes: val('inp-notes') // New Field
             },
             meta: {
                 labeled_at: Date.now()
@@ -243,20 +344,10 @@ window.app = {
     async exportData() {
         const allItems = await db.getAllExport();
 
-        // Transform to Schema for Export
         const exportJson = allItems.map(item => {
-            // Reconstruct the JSON structure user wants
-            // The 'label' object is already structured in saveItem to match `expected`
-            // But we should wrap it nicely.
-
-            // If item is 'new' or 'skipped', label might be empty.
-            // If 'done', label checks out.
-
             return {
-                id: `TC_MANUAL_${item.id}`,
+                id: item.original.manual_id || `TC_MANUAL_${item.id}`,
                 input: item.original,
-                // If we have a label, spread it (it contains parsing, cat, etc.)
-                // If not, put null or basic
                 ... (item.label || { status: 'UNLABELED' })
             };
         });
@@ -265,7 +356,7 @@ window.app = {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `sms_labels_export_v1.2_${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `sms_labels_export_v1.4_${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
     }
 };
@@ -354,11 +445,12 @@ function renderEditor(item) {
     document.getElementById('inp-acc-type').value = acc.account_type || 'N/A';
 
     document.getElementById('inp-category').value = cat.category_id || 'N/A';
-    document.getElementById('inp-match-method').value = cat.match_method || 'N/A';
     document.getElementById('inp-match-key').value = cat.matched_keyword || '';
 
     document.getElementById('inp-type').value = flatType;
     document.getElementById('inp-status').value = flatStatus;
     document.getElementById('inp-rewards').value = tx.reward_points || '';
+    document.getElementById('inp-currency').value = tx.currency || 'INR';
+    document.getElementById('inp-notes').value = tx.notes || '';
     document.getElementById('inp-hidden').checked = !!tx.is_hidden;
 }
