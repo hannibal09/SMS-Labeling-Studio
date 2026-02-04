@@ -116,53 +116,96 @@ window.app = {
     },
 
     autoFill() {
-        // Regex heuristics for auto-fill based on body
+        // Regex heuristics
         const body = document.getElementById('p-body').textContent;
+        const sender = document.getElementById('p-sender').textContent;
 
-        // 1. Amount ( Rs 123.45 )
+        // 1. Amount
         const amtMatch = body.match(/(?:Rs\.?|INR)\s*([\d,]+\.?\d*)/i);
         if (amtMatch) {
             document.getElementById('inp-amount').value = amtMatch[1].replace(/,/g, '');
         }
 
-        // 2. Account ( xx1234 )
+        // 2. Account
         const accMatch = body.match(/(?:x+|X+|\*+)(\d{4})/);
-        if (accMatch) {
-            document.getElementById('inp-acc').value = accMatch[1];
-        }
+        if (accMatch) document.getElementById('inp-acc').value = accMatch[1];
 
-        // 3. Merchant (at AMAZON) - very basic heuristic
+        // 3. Bank Name (Basic Sender Map)
+        if (sender.includes('HDFC')) document.getElementById('inp-bank').value = 'HDFC';
+        else if (sender.includes('ICICI')) document.getElementById('inp-bank').value = 'ICICI';
+        else if (sender.includes('SBI')) document.getElementById('inp-bank').value = 'SBI';
+        else if (sender.includes('AXIS')) document.getElementById('inp-bank').value = 'AXIS';
+
+        // 4. Merchant Guess
+        // Simple 'at MERCHANT' or 'to MERCHANT'
         const merchMatch = body.match(/(?:at|to|from)\s+([A-Z0-9\s]+?)(?:\s+(?:on|via|ref)|$)/i);
         if (merchMatch) {
             let m = merchMatch[1].trim();
-            if (m.length > 20) m = m.substring(0, 20); // Safety cap
-            document.getElementById('inp-merchant').value = m;
+            if (m.length > 25) m = m.substring(0, 25);
+            document.getElementById('inp-merch-raw').value = m;
+            document.getElementById('inp-merch-clean').value = m.toLowerCase();
+            document.getElementById('inp-match-key').value = m.toLowerCase();
+            document.getElementById('inp-match-method').value = 'WORD_MATCH';
+            document.getElementById('inp-category').value = 'misc'; // Default
         }
 
-        // 4. Intent Guessing
-        if (/otp|code/i.test(body)) document.getElementById('inp-intent').value = 'OTP';
-        else if (/debited/i.test(body)) {
+        // 5. Intent/Status Guess
+        if (/otp|code/i.test(body)) {
+            document.getElementById('inp-intent').value = 'OTP';
+            document.getElementById('inp-status').value = 'PENDING_OTP';
+        } else if (/debited/i.test(body)) {
             document.getElementById('inp-intent').value = 'TRANSACTION';
             document.getElementById('inp-type').value = 'EXPENSE';
-        }
-        else if (/credited/i.test(body)) {
+            document.getElementById('inp-status').value = 'COMPLETED';
+        } else if (/credited/i.test(body)) {
             document.getElementById('inp-intent').value = 'TRANSACTION';
             document.getElementById('inp-type').value = 'INCOME';
+            document.getElementById('inp-status').value = 'COMPLETED';
         }
     },
 
     async saveItem() {
         if (!selectedId) return;
 
+        // Construct the Nested Schema Object
         const labelData = {
-            intent: document.getElementById('inp-intent').value,
-            amount: parseFloat(document.getElementById('inp-amount').value) || null,
-            account_digits: document.getElementById('inp-acc').value,
-            merchant_cleaned: document.getElementById('inp-merchant').value,
-            transaction_type: document.getElementById('inp-type').value,
-            transaction_status: document.getElementById('inp-status').value,
-            // Add timestamp of edit
-            labeled_at: Date.now()
+            parsing: {
+                intent: val('inp-intent'),
+                amount: floatVal('inp-amount'),
+                merchant_raw: val('inp-merch-raw'),
+                merchant_cleaned: val('inp-merch-clean'),
+                account_digits: val('inp-acc'),
+                transaction_type: val('inp-type'),
+                balance_available: floatVal('inp-balance'),
+                // We don't have is_otp input, derive from intent
+                is_otp: val('inp-intent') === 'OTP',
+                upi_ref: val('inp-upi'),
+                date_extracted: val('inp-date-ext')
+            },
+            categorization: {
+                category_id: val('inp-category'),
+                match_method: val('inp-match-method'),
+                matched_keyword: val('inp-match-key'),
+                // default values we can't fully guess yet
+                confidence: 1.0
+            },
+            account_resolution: {
+                bank_name: val('inp-bank'),
+                account_last_4: val('inp-acc'),
+                account_type: val('inp-acc-type')
+            },
+            transaction_fields: {
+                amount: floatVal('inp-amount'),
+                status: val('inp-status'),
+                type: val('inp-type'),
+                reward_points: floatVal('inp-rewards'),
+                is_hidden: document.getElementById('inp-hidden').checked,
+                currency: 'INR',
+                timestamp: currentItems.find(i => i.id === selectedId).original.timestamp
+            },
+            meta: {
+                labeled_at: Date.now()
+            }
         };
 
         await db.updateItem(selectedId, {
@@ -170,30 +213,23 @@ window.app = {
             status: 'done'
         });
 
-        // Mark visual as done
         const el = document.getElementById(`item-${selectedId}`);
         if (el) el.classList.add('done');
-
-        // Auto-advance
         this.nextItemInPage();
     },
 
     async skipItem() {
         if (!selectedId) return;
         await db.updateItem(selectedId, { status: 'skipped' });
-
-        // Mark visual
         const el = document.getElementById(`item-${selectedId}`);
         if (el) {
             el.classList.add('done');
             el.style.opacity = '0.3';
         }
-
         this.nextItemInPage();
     },
 
     nextItemInPage() {
-        // Find next Sibling ID
         const currentEl = document.getElementById(`item-${selectedId}`);
         const nextEl = currentEl.nextElementSibling;
         if (nextEl) {
@@ -207,14 +243,21 @@ window.app = {
     async exportData() {
         const allItems = await db.getAllExport();
 
-        // Transform to Schema
+        // Transform to Schema for Export
         const exportJson = allItems.map(item => {
-            // Merge Label with basic Structure
-            // This structure mimics `expected` block in Master JSON
+            // Reconstruct the JSON structure user wants
+            // The 'label' object is already structured in saveItem to match `expected`
+            // But we should wrap it nicely.
+
+            // If item is 'new' or 'skipped', label might be empty.
+            // If 'done', label checks out.
+
             return {
+                id: `TC_MANUAL_${item.id}`,
                 input: item.original,
-                expected_label: item.label,
-                status: item.status
+                // If we have a label, spread it (it contains parsing, cat, etc.)
+                // If not, put null or basic
+                ... (item.label || { status: 'UNLABELED' })
             };
         });
 
@@ -222,10 +265,20 @@ window.app = {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `sms_labels_export_${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `sms_labels_export_v1.2_${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
     }
 };
+
+// Helper: Get Value
+function val(id) {
+    const el = document.getElementById(id);
+    return el ? el.value : null;
+}
+function floatVal(id) {
+    const v = val(id);
+    return v ? parseFloat(v) : null;
+}
 
 async function loadPage(pageIndex) {
     const listEl = document.getElementById('sms-list');
@@ -271,13 +324,41 @@ function renderEditor(item) {
     document.getElementById('p-date').textContent = new Date(item.original.timestamp).toLocaleString();
     document.getElementById('p-body').textContent = item.original.body;
 
-    // Form Values (Load existing or default)
-    const label = item.label || {};
+    // Form Values
+    // Check if we have the NEW nested structure (label.parsing) or OLD flat structure
+    const L = item.label || {};
+    const parsing = L.parsing || {};
+    const cat = L.categorization || {};
+    const acc = L.account_resolution || {};
+    const tx = L.transaction_fields || {};
 
-    document.getElementById('inp-intent').value = label.intent || 'N/A';
-    document.getElementById('inp-amount').value = label.amount || '';
-    document.getElementById('inp-acc').value = label.account_digits || '';
-    document.getElementById('inp-merchant').value = label.merchant_cleaned || '';
-    document.getElementById('inp-type').value = label.transaction_type || 'N/A';
-    document.getElementById('inp-status').value = label.transaction_status || 'N/A';
+    // Flat mapping fallback (if migrating from v1.0 data)
+    const flatIntent = L.intent || parsing.intent || 'N/A';
+    const flatAmount = L.amount || parsing.amount || '';
+    const flatAcc = L.account_digits || parsing.account_digits || '';
+    const flatMerchClean = L.merchant_cleaned || parsing.merchant_cleaned || '';
+    const flatType = L.transaction_type || tx.type || 'N/A';
+    const flatStatus = L.transaction_status || tx.status || 'N/A';
+
+    // Populate Fields
+    document.getElementById('inp-intent').value = flatIntent;
+    document.getElementById('inp-amount').value = flatAmount;
+    document.getElementById('inp-balance').value = parsing.balance_available || '';
+    document.getElementById('inp-merch-raw').value = parsing.merchant_raw || '';
+    document.getElementById('inp-merch-clean').value = flatMerchClean;
+    document.getElementById('inp-upi').value = parsing.upi_ref || '';
+    document.getElementById('inp-date-ext').value = parsing.date_extracted || '';
+
+    document.getElementById('inp-bank').value = acc.bank_name || '';
+    document.getElementById('inp-acc').value = flatAcc; // Shared
+    document.getElementById('inp-acc-type').value = acc.account_type || 'N/A';
+
+    document.getElementById('inp-category').value = cat.category_id || 'N/A';
+    document.getElementById('inp-match-method').value = cat.match_method || 'N/A';
+    document.getElementById('inp-match-key').value = cat.matched_keyword || '';
+
+    document.getElementById('inp-type').value = flatType;
+    document.getElementById('inp-status').value = flatStatus;
+    document.getElementById('inp-rewards').value = tx.reward_points || '';
+    document.getElementById('inp-hidden').checked = !!tx.is_hidden;
 }
