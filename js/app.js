@@ -50,9 +50,23 @@ async function handleFileUpload(e) {
     reader.onload = async (event) => {
         try {
             const json = JSON.parse(event.target.result);
-            // Expecting array of SMS objects
+
+            let itemsToImport = [];
+
+            // Case A: Flat Array (Legacy)
+            if (Array.isArray(json)) {
+                itemsToImport = json;
+            }
+            // Case B: Wrapped Object (Project A Export)
+            else if (json.samples && Array.isArray(json.samples)) {
+                itemsToImport = json.samples;
+            }
+            else {
+                throw new Error('JSON must be an array or have a "samples" array.');
+            }
+
             // Convert to internal format: { original: sms, label: {}, status: 'new' }
-            const payload = json.map(sms => ({
+            const payload = itemsToImport.map(sms => ({
                 original: sms,
                 label: {},
                 status: 'new'
@@ -66,7 +80,7 @@ async function handleFileUpload(e) {
             }
         } catch (err) {
             console.error(err);
-            alert('Invalid JSON file');
+            alert(`Invalid JSON file: ${err.message}`);
         }
     };
     reader.readAsText(file);
