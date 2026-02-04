@@ -10,37 +10,13 @@ let currentItems = [];
 let selectedId = null;
 
 // Initialize
-window.addEventListener('DOMContentLoaded', async () => {
-    await db.init();
-    await refreshStats();
-    loadPage(0);
-
-    // Shortcuts
-    document.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.key === 's') {
-            e.preventDefault();
-            app.saveItem();
-        }
-        if (e.ctrlKey && e.key === 'k') {
-            e.preventDefault();
-            app.skipItem();
-        }
-    });
-
-    // File Upload Listener
-    document.getElementById('file-upload').addEventListener('change', handleFileUpload);
+// Initialize
+window.addEventListener('DOMContentLoaded', () => {
+    window.app.init();
 });
 
-async function refreshStats() {
-    totalItems = await db.getCount();
-    document.getElementById('stats-counter').textContent = `Total: ${totalItems}`;
+// Removed legacy refreshStats
 
-    // Update pagination buttons
-    const maxPage = Math.ceil(totalItems / PAGE_SIZE) - 1;
-    document.querySelector('button[onclick="app.nextPage()"]').disabled = currentPage >= maxPage;
-    document.querySelector('button[onclick="app.prevPage()"]').disabled = currentPage <= 0;
-    document.getElementById('page-indicator').textContent = `Page ${currentPage + 1} of ${maxPage + 1 || 1}`;
-}
 
 const CATEGORIES = [
     { id: "dining", name: "Dining & Food", parent_id: null },
@@ -450,7 +426,7 @@ async function loadPage(pageIndex) {
         listEl.appendChild(div);
     });
 
-    refreshStats();
+    // refreshStats(); // Handled by app.refreshList
 }
 
 function renderEditor(item) {
