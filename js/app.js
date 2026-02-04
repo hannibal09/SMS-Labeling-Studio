@@ -76,12 +76,20 @@ let currentTags = [];
 // Global App Object
 window.app = {
     async init() {
-        console.log('App Initializing...');
-        await db.init();
-        this.initCategories();
-        this.initTags();
-        this.bindEvents();
-        this.refreshList();
+        console.log('App Initializing... v1.7');
+        try {
+            await db.init();
+            console.log('DB Init Success');
+            this.initCategories();
+            this.initTags();
+            this.bindEvents();
+            console.log('Events Bound');
+            await this.refreshList();
+            console.log('Initial Refresh Done');
+        } catch (e) {
+            console.error('Initialization Failed:', e);
+            alert('App Initialization Failed. Check Console.');
+        }
     },
 
     initCategories() {
@@ -167,13 +175,16 @@ window.app = {
     },
 
     async handleFileUpload(event) {
+        console.log('File selected:', event.target.files[0]);
         const file = event.target.files[0];
         if (!file) return;
 
         const reader = new FileReader();
         reader.onload = async (e) => {
+            console.log('File read complete');
             try {
                 const json = JSON.parse(e.target.result);
+                console.log('JSON parsed:', Object.keys(json));
 
                 let data = [];
                 if (Array.isArray(json)) {
@@ -183,36 +194,44 @@ window.app = {
                 } else if (Array.isArray(json.samples)) {
                     data = json.samples;
                 } else if (Array.isArray(json.test_cases)) {
-                    // Map test_cases input to expected structure if needed, or just take them
-                    // Test cases usually have { input: { body, sender... } }
-                    // Our app expects item.sender or item.original.sender
-                    // Let's normalize later. For now just grab the array.
                     data = json.test_cases.map(tc => tc.input ? { ...tc.input, ...tc } : tc);
                 } else {
                     throw new Error("JSON must contain an array, or 'messages', 'samples', or 'test_cases' list.");
                 }
 
-                // Add Unique DB ID if not present + Unique ID for Export
-                const processed = data.map(item => {
-                    // Normalize: If item has 'input' key (from some exports), flatten it or stick to standard
-                    const sms = item.input || item.original || item;
+                console.log('Data extracted, items:', data.length);
 
+                // Add Unique DB ID if not present + Unique ID for Export
+                const processed = data.map((item, idx) => {
+                    const sms = item.input || item.original || item;
                     return {
-                        original: sms, // Keep the raw SMS data in 'original'
+                        original: sms,
                         timestamp: sms.timestamp || Date.now(),
                         manual_id: item.manual_id || item.id || `hash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                        // Preserve label if re-importing
                         ...(item.label ? { label: item.label, status: 'done' } : { label: {}, status: 'new' })
                     };
                 });
+                console.log('Data processed ready for DB');
 
-                await db.importBulk(processed); // Fixed function name
-                await this.refreshList(); // Ensure UI updates before alert
+                await db.importBulk(processed);
+                console.log('DB Import done');
+
+                await this.refreshList();
+                console.log('List refreshed');
+
                 alert(`Imported ${processed.length} messages.`);
             } catch (err) {
-                console.error(err);
+                console.error('Import Error:', err);
                 alert(`Import Failed: ${err.message}`);
+            } finally {
+                // Reset file input so checking the same file again works
+                event.target.value = '';
             }
+        };
+        reader.onerror = (e) => {
+            console.error('FileReader Error:', e);
+            alert('Error reading file');
+            event.target.value = '';
         };
         reader.readAsText(file);
     },
