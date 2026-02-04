@@ -264,6 +264,7 @@ window.app = {
         const item = await db.getItem(id);
         if (item) {
             renderEditor(item);
+
             // Highlight list item
             document.querySelectorAll('.sms-item').forEach(el => el.classList.remove('bg-indigo-50', 'border-indigo-500'));
             const el = document.getElementById(`item-${id}`);
@@ -271,7 +272,28 @@ window.app = {
                 el.classList.add('bg-indigo-50', 'border-indigo-500');
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
+
+            // MOBILE VIEW LOGIC:
+            // Check if we are in mobile mode (check if sidebar is taking full width or if editor is hidden)
+            // Or simpler: Check window width < 768px (MD breakpoint)
+            if (window.innerWidth < 768) {
+                // Hide Sidebar, Show Editor
+                document.getElementById('sms-sidebar').classList.add('hidden');
+                document.getElementById('main-editor').classList.remove('hidden');
+                // Ensure flex is added back if it was toggled via class
+                document.getElementById('main-editor').classList.add('flex');
+            }
         }
+    },
+
+    backToList() {
+        // Show Sidebar, Hide Editor
+        document.getElementById('sms-sidebar').classList.remove('hidden');
+        document.getElementById('main-editor').classList.add('hidden');
+        document.getElementById('main-editor').classList.remove('flex');
+
+        // Refresh list just in case status changed
+        this.refreshList();
     },
 
     autoFill() {

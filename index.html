@@ -33,7 +33,7 @@
     <header class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shadow-sm z-10">
         <div class="flex items-center gap-3">
             <h1 class="text-xl font-bold text-indigo-700">SMS Labeling Studio</h1>
-            <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono">v1.10 (Foldable)</span>
+            <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono">v1.11</span>
         </div>
         <div class="flex items-center gap-4 text-sm">
             <div id="status-storage" class="flex items-center gap-1 text-slate-500">
@@ -91,9 +91,19 @@
                 <!-- SMS Preview Card -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 md:p-6 mb-6">
                     <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Sender</span>
-                            <div id="p-sender" class="text-lg font-bold text-slate-800">HDFCBK</div>
+                        <div class="flex items-center gap-2">
+                            <!-- Back Button (Mobile Only) -->
+                            <button onclick="app.backToList()" class="md:hidden text-slate-500 hover:text-indigo-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                </svg>
+                            </button>
+                            <div>
+                                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Sender</span>
+                                <div id="p-sender" class="text-lg font-bold text-slate-800">HDFCBK</div>
+                            </div>
                         </div>
                         <div class="text-right">
                             <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Date</span>
@@ -364,7 +374,7 @@
         </main>
     </div>
 
-    <script type="module" src="js/app.js?v=1.10"></script>
+    <script type="module" src="js/app.js?v=1.11"></script>
 </body>
 
 </html>
