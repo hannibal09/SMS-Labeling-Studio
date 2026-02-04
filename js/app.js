@@ -88,12 +88,18 @@ const CATEGORIES = [
     { id: "education-school", name: "School Fees", parent_id: "education" }
 ];
 
+const TAGS = ["alert", "atm", "balance", "bill-payment", "card-swipe", "card-update", "cashback", "charge", "cheque", "complete-fields", "confirmation", "contra", "critical", "debit", "dining", "document-expiry", "emi", "emi-converted", "emi-offer", "expense", "failed", "fd", "fund-block", "hdfc", "income", "info", "info-only", "interest", "investment", "kyc", "lien", "limit-update", "loan", "mandate", "maturity", "metadata", "multiline", "orphaned", "overdue", "p2p", "parent-linking", "payment-due", "pin-error", "points", "pos", "promotional", "recharge", "refund", "reminder", "renewal", "reversed", "rewards", "security", "server-error", "si", "sip", "smartbuy", "statement", "status-test", "subscription", "transfer", "unconfirmed", "upcoming-debit", "upi", "utility"];
+
+// Global State for Tags
+let currentTags = [];
+
 // Global App Object
 window.app = {
     async init() {
         console.log('App Initializing...');
         await db.init();
         this.initCategories();
+        this.initTags();
         this.bindEvents();
         this.refreshList();
     },
@@ -121,6 +127,46 @@ window.app = {
                 cOption.textContent = `  ↳ ${c.name}`; // Indent
                 select.appendChild(cOption);
             });
+        });
+    },
+
+    initTags() {
+        const select = document.getElementById('inp-tags-select');
+        select.innerHTML = '<option value="">-- Select Tag --</option>';
+        TAGS.forEach(tag => {
+            const opt = document.createElement('option');
+            opt.value = tag;
+            opt.textContent = tag;
+            select.appendChild(opt);
+        });
+    },
+
+    addTagFromSelect() {
+        const select = document.getElementById('inp-tags-select');
+        const tag = select.value;
+        if (tag && !currentTags.includes(tag)) {
+            currentTags.push(tag);
+            this.renderTags();
+        }
+        select.value = ''; // Reset
+    },
+
+    removeTag(tag) {
+        currentTags = currentTags.filter(t => t !== tag);
+        this.renderTags();
+    },
+
+    renderTags() {
+        const container = document.getElementById('tags-container');
+        container.innerHTML = '';
+        currentTags.forEach(tag => {
+            const span = document.createElement('span');
+            span.className = 'bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold flex items-center gap-1';
+            span.innerHTML = `
+                ${tag}
+                <button onclick="app.removeTag('${tag}')" class="hover:text-red-500 text-indigo-400 font-bold ml-1">×</button>
+            `;
+            container.appendChild(span);
         });
     },
 
@@ -302,7 +348,8 @@ window.app = {
                 is_hidden: document.getElementById('inp-hidden').checked,
                 currency: val('inp-currency'),
                 timestamp: original.timestamp,
-                notes: val('inp-notes') // New Field
+                notes: val('inp-notes'),
+                tags: currentTags // Array of strings
             },
             meta: {
                 labeled_at: Date.now()
@@ -453,4 +500,13 @@ function renderEditor(item) {
     document.getElementById('inp-currency').value = tx.currency || 'INR';
     document.getElementById('inp-notes').value = tx.notes || '';
     document.getElementById('inp-hidden').checked = !!tx.is_hidden;
+
+    // Tags
+    currentTags = tx.tags || [];
+    // If migrating from 'input.tags', consider checking item.original.tags (but usually we label fresh)
+    if (currentTags.length === 0 && item.original.tags) {
+        // Pre-fill from existing tags if any (optional feature, maybe useful)
+        // currentTags = [...item.original.tags]; 
+    }
+    app.renderTags();
 }

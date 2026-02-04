@@ -33,7 +33,7 @@
     <header class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shadow-sm z-10">
         <div class="flex items-center gap-3">
             <h1 class="text-xl font-bold text-indigo-700">SMS Labeling Studio</h1>
-            <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono">v1.4</span>
+            <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono">v1.5</span>
         </div>
         <div class="flex items-center gap-4 text-sm">
             <div id="status-storage" class="flex items-center gap-1 text-slate-500">
@@ -299,6 +299,23 @@
                                         class="w-full border border-slate-300 rounded px-3 py-2" value="INR">
                                 </div>
                                 <div class="col-span-2">
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Tags</label>
+                                    <div class="flex gap-2 mb-2">
+                                        <select id="inp-tags-select"
+                                            class="flex-1 border border-slate-300 rounded px-3 py-2 text-sm bg-white">
+                                            <!-- Populated by JS -->
+                                        </select>
+                                        <button type="button" onclick="app.addTagFromSelect()"
+                                            class="bg-indigo-100 text-indigo-700 px-3 py-2 rounded hover:bg-indigo-200 font-bold text-sm">
+                                            + Add
+                                        </button>
+                                    </div>
+                                    <div id="tags-container"
+                                        class="flex flex-wrap gap-2 min-h-[32px] p-2 border border-slate-200 rounded bg-slate-50">
+                                        <!-- Tags injected here -->
+                                    </div>
+                                </div>
+                                <div class="col-span-2">
                                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Notes</label>
                                     <textarea id="inp-notes"
                                         class="w-full border border-slate-300 rounded px-3 py-2 h-16 text-sm"
@@ -344,7 +361,7 @@
         </main>
     </div>
 
-    <script type="module" src="js/app.js?v=1.4"></script>
+    <script type="module" src="js/app.js?v=1.5"></script>
 </body>
 
 </html>
