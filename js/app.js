@@ -203,7 +203,7 @@ window.app = {
                 });
 
                 await db.importBulk(processed); // Fixed function name
-                this.refreshList();
+                await this.refreshList(); // Ensure UI updates before alert
                 alert(`Imported ${processed.length} messages.`);
             } catch (err) {
                 console.error(err);
@@ -216,7 +216,7 @@ window.app = {
     // ... (rest of simple methods)
 
     async refreshList() {
-        const count = await db.countItems();
+        const count = await db.getCount(); // Fixed function name
         const stats = await db.getStats();
 
         const total = count;
