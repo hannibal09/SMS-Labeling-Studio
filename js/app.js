@@ -170,23 +170,44 @@ window.app = {
         reader.onload = async (e) => {
             try {
                 const json = JSON.parse(e.target.result);
-                // Ensure array
-                const data = Array.isArray(json) ? json : (json.messages || []);
+
+                let data = [];
+                if (Array.isArray(json)) {
+                    data = json;
+                } else if (Array.isArray(json.messages)) {
+                    data = json.messages;
+                } else if (Array.isArray(json.samples)) {
+                    data = json.samples;
+                } else if (Array.isArray(json.test_cases)) {
+                    // Map test_cases input to expected structure if needed, or just take them
+                    // Test cases usually have { input: { body, sender... } }
+                    // Our app expects item.sender or item.original.sender
+                    // Let's normalize later. For now just grab the array.
+                    data = json.test_cases.map(tc => tc.input ? { ...tc.input, ...tc } : tc);
+                } else {
+                    throw new Error("JSON must contain an array, or 'messages', 'samples', or 'test_cases' list.");
+                }
 
                 // Add Unique DB ID if not present + Unique ID for Export
-                const processed = data.map(item => ({
-                    ...item,
-                    timestamp: item.timestamp || Date.now(), // Ensure Timestamp
-                    // Generate a consistent ID if not present
-                    manual_id: `hash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-                }));
+                const processed = data.map(item => {
+                    // Normalize: If item has 'input' key (from some exports), flatten it or stick to standard
+                    const sms = item.input || item.original || item;
+
+                    return {
+                        original: sms, // Keep the raw SMS data in 'original'
+                        timestamp: sms.timestamp || Date.now(),
+                        manual_id: item.manual_id || item.id || `hash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                        // Preserve label if re-importing
+                        ...(item.label ? { label: item.label, status: 'done' } : { label: {}, status: 'new' })
+                    };
+                });
 
                 await db.importData(processed);
                 this.refreshList();
                 alert(`Imported ${processed.length} messages.`);
             } catch (err) {
                 console.error(err);
-                alert('Invalid JSON file');
+                alert(`Import Failed: ${err.message}`);
             }
         };
         reader.readAsText(file);
