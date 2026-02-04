@@ -130,6 +130,28 @@ class SMSDB {
         });
     }
 
+    async getStats() {
+        return new Promise((resolve) => {
+            const tx = this.db.transaction(STORE_ITEMS, 'readonly');
+            const store = tx.objectStore(STORE_ITEMS);
+            const index = store.index('status');
+
+            const reqDone = index.count('done');
+            const reqSkipped = index.count('skipped');
+
+            let done = 0;
+            let skipped = 0;
+
+            reqDone.onsuccess = () => {
+                done = reqDone.result;
+                reqSkipped.onsuccess = () => {
+                    skipped = reqSkipped.result;
+                    resolve({ done, skipped });
+                };
+            };
+        });
+    }
+
     async getCount() {
         return new Promise((resolve) => {
             const req = this.db.transaction(STORE_ITEMS, 'readonly').objectStore(STORE_ITEMS).count();

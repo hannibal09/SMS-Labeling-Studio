@@ -202,7 +202,7 @@ window.app = {
                     };
                 });
 
-                await db.importData(processed);
+                await db.importBulk(processed); // Fixed function name
                 this.refreshList();
                 alert(`Imported ${processed.length} messages.`);
             } catch (err) {
