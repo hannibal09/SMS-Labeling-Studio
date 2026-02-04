@@ -524,3 +524,10 @@ function renderEditor(item) {
     }
     app.renderTags();
 }
+
+// Initialization Logic
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => window.app.init());
+} else {
+    window.app.init();
+}
