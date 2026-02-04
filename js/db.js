@@ -69,29 +69,44 @@ class SMSDB {
     }
 
     async getPage(pageIndex, pageSize) {
-        // Since IDB cursor skipping is slow for large offsets, 
-        // we use a simple range query assuming keys are sequential integers 1..N
-        // This is a simplification for performance.
+        // Robust Pagination: Get all keys, slice the range, then get items.
+        // This handles gaps and non-resetting auto-increment IDs correctly.
+        return new Promise(async (resolve, reject) => {
+            try {
+                const tx = this.db.transaction(STORE_ITEMS, 'readonly');
+                const store = tx.objectStore(STORE_ITEMS);
 
-        const start = pageIndex * pageSize + 1; // 1-based IDs
-        const end = start + pageSize;
-        const range = IDBKeyRange.bound(start, end, false, true); // [start, end)
+                // Get all keys (low overhead)
+                const allKeysReq = store.getAllKeys();
 
-        return new Promise((resolve, reject) => {
-            const store = this.db.transaction(STORE_ITEMS, 'readonly').objectStore(STORE_ITEMS);
-            const request = store.openCursor(range);
-            const data = [];
+                allKeysReq.onsuccess = async () => {
+                    const allKeys = allKeysReq.result;
+                    const start = pageIndex * pageSize;
+                    const end = start + pageSize;
+                    const pageKeys = allKeys.slice(start, end);
 
-            request.onsuccess = (event) => {
-                const cursor = event.target.result;
-                if (cursor) {
-                    data.push(cursor.value);
-                    cursor.continue();
-                } else {
-                    resolve(data);
-                }
-            };
-            request.onerror = reject;
+                    if (pageKeys.length === 0) {
+                        resolve([]);
+                        return;
+                    }
+
+                    // Fetch items for these keys
+                    // Promise.all is cleaner than cursor here for small page sizes
+                    const itemPromises = pageKeys.map(key => {
+                        return new Promise((res, rej) => {
+                            const req = store.get(key);
+                            req.onsuccess = () => res(req.result);
+                            req.onerror = rej;
+                        });
+                    });
+
+                    const items = await Promise.all(itemPromises);
+                    resolve(items);
+                };
+                allKeysReq.onerror = reject;
+            } catch (err) {
+                reject(err);
+            }
         });
     }
 

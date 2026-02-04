@@ -11,9 +11,13 @@ let selectedId = null;
 
 // Initialize
 // Initialize
-window.addEventListener('DOMContentLoaded', () => {
+// Initialize
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => window.app.init());
+} else {
+    // DOM already ready (module loaded late)
     window.app.init();
-});
+}
 
 // Removed legacy refreshStats
 
